@@ -1,0 +1,166 @@
+# Cycle1.sh : min1 —> min1 —> eq1 —> eqa
+srun /home/debostuti/amber24/bin/sander -O -i min1.in -o min1.out -p 2i2i.top -c 2i2i.crd -x min1.crd -r min1.rst -inf min1.info -ref 2i2i.crd
+srun /home/debostuti/amber24/bin/sander -O -i min1_1.in -o min1_1.out -p 2i2i.top -c min1.rst -x min1_1.crd -r min1_1.rst -inf min1_1.info -ref min1.rst
+srun /home/debostuti/amber24/bin/sander -O -i eq1.in -o eq1.out -p 2i2i.top -c min1_1.rst -x eq1.crd -r eq1.rst -inf eq1.info -ref min1_1.rst
+srun /home/debostuti/amber24/bin/sander -O -i eqa.in -o eqa.out -p 2i2i.top -c eq1.rst -x eqa.crd -r eqa.rst -inf eqa.info -ref eq1.rst
+
+# Cycle2.sh : min2 —> eq2 —> eqb
+srun /home/debostuti/amber24/bin/pmemd.cuda -O -i min2.in -o min2.out -p 2i2i.top -c eqa.rst -x min2.crd -r min2.rst -inf min2.info -ref eqa.rst
+srun /home/debostuti/amber24/bin/pmemd.cuda -O -i eq2.in -o eq2.out -p 2i2i.top -c min2.rst -x eq2.crd -r eq2.rst -inf eq2.info -ref min2.rst
+srun /home/debostuti/amber24/bin/pmemd.cuda -O -i eqb.in -o eqb.out -p 2i2i.top -c eq2.rst -x eqb.crd -r eqb.rst -inf eqb.info -ref eq2.rst
+
+# Cycle3.sh : min3 —> eq3 —> eqc
+srun /home/debostuti/amber24/bin/pmemd.cuda -O -i min3.in -o min3.out -p 2i2i.top -c eqb.rst -x min3.crd -r min3.rst -inf min3.info -ref eqb.rst
+srun /home/debostuti/amber24/bin/pmemd.cuda -O -i eq3.in -o eq3.out -p 2i2i.top -c min3.rst -x eq3.crd -r eq3.rst -inf eq3.info -ref min3.rst
+srun /home/debostuti/amber24/bin/pmemd.cuda -O -i eqc.in -o eqc.out -p 2i2i.top -c eq3.rst -x eqc.crd -r eqc.rst -inf eqc.info -ref eq3.rst
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+## Min and Eq:
+# min1.in
+shake, belly minimization of hydrogens in waters)
+&cntrl
+   imin = 1, maxcyc = 500, ncyc = 250, ntb =1, cut = 8.0, ntr=1
+  &end
+Restrain all the atoms
+10.0
+RES 1 25
+END
+END
+
+# eq1.in
+rm to 298K quickly,
+ &cntrl
+  imin = 0, ntx = 1, irest = 0,
+  ntpr = 1000, ntwx = 0, ntwe = 0,
+  ntc = 2, ntf = 2, ntb = 1, ntr=1,
+  nstlim = 25000,  dt =0.002,
+  tempi=10.0, temp0 = 298.0, ntt =1, tautp =2.0,
+  ntp = 0, taup = 0.2, pres0 =1.0,
+ &end
+Restrain all the atoms
+10.0
+RES 1 25
+END
+END
+
+# eqa.in
+NPT @ 298K,
+ &cntrl
+  imin = 0, ntx = 7, irest = 1,
+  ntpr = 1000, ntwx = 0, ntwe = 0,
+  ntc = 2, ntf = 2, iwrap=1,
+  nstlim = 250000,  dt =0.002, ntr = 1,
+  tempi=298.0, temp0 = 298.0, ntt =1, tautp =2.0,
+  ntb = 2, ntp = 1, taup = 0.2, pres0 =1.0,
+ &end
+Restrain all the atoms
+10.0
+RES 1 25
+END
+END
+
+# min2.in
+shake, belly minimization of hydrogens in waters)
+&cntrl
+   imin = 1, maxcyc = 1000, ncyc = 500, ntb =1, cut = 8.0, ntr=1
+  &end
+Restrain all the atoms
+2.0
+RES 1 25
+END
+END
+
+# eq2.in
+rm to 298K slowly,
+ &cntrl
+  imin = 0, ntx = 1, irest = 0,
+  ntpr = 1000, ntwx = 0, ntwe = 0,
+  ntc = 2, ntf = 2, ntb = 1,
+  nstlim = 175000,  dt =0.002,
+  nmropt = 1, ntt =1, tautp =2.0,
+  ntp = 0, taup = 0.2, pres0 =1.0,
+ &end
+#
+# from steps     0 to  25000:raise temperature  10->100K
+# from steps  25001 to 75000:equilibrate under 100K
+# from steps 75001 to 100000:raise temperature 100->200K
+# from steps 100001 to 150000:equilibrate under 200K
+# from steps 150001 to 175000:raise temperature 200->298K
+#
+ &wt type='TEMP0', istep1=0,istep2=25000, value1=10.,
+            value2=100.,     &end
+ &wt type='TEMP0', istep1=25001,istep2=75000, value1=100.,
+            value2=100.,     &end
+ &wt type='TEMP0', istep1=75001,istep2=100000, value1=100.,
+            value2=200.,     &end
+ &wt type='TEMP0', istep1=100001,istep2=150000, value1=200.,
+            value2=200.,     &end
+ &wt type='TEMP0', istep1=150001,istep2=175000, value1=200.,
+            value2=298.,     &end
+ &wt type='END'   &end
+
+# eqb.in
+NPT @ 298K,
+ &cntrl
+  imin = 0, ntx = 7, irest = 1,
+  ntpr = 1000, ntwx = 0, ntwe = 0,
+  ntc = 2, ntf = 2, iwrap=1,
+  nstlim = 250000,  dt =0.002, ntr = 1,
+  tempi=298.0, temp0 = 298.0, ntt =1, tautp =2.0,
+  ntb = 2, ntp = 1, taup = 0.2, pres0 =1.0,
+ &end
+Restrain all the atoms
+2.0
+RES 1 25
+END
+END
+
+# min3.in
+shake, belly minimization of hydrogens in waters)                              
+&cntrl                                                                         
+   imin = 1, maxcyc = 1000, ncyc = 500, ntb =1, cut = 8.0                     
+  &end 
+
+
+# eq3.in
+rm to 298K slowly,
+ &cntrl
+  imin = 0, ntx = 1, irest = 0,
+  ntpr = 1000, ntwx = 0, ntwe = 0,
+  ntc = 2, ntf = 2, ntb = 1,
+  nstlim = 175000,  dt =0.002,
+  nmropt = 1, ntt =1, tautp =2.0,
+  ntp = 0, taup = 0.2, pres0 =1.0,
+ &end
+#
+# from steps     0 to  25000:raise temperature  10->100K
+# from steps  25001 to 75000:equilibrate under 100K
+# from steps 75001 to 100000:raise temperature 100->200K
+# from steps 100001 to 150000:equilibrate under 200K
+# from steps 150001 to 175000:raise temperature 200->298K
+#
+ &wt type='TEMP0', istep1=0,istep2=25000, value1=10.,
+            value2=100.,     &end
+ &wt type='TEMP0', istep1=25001,istep2=75000, value1=100.,
+            value2=100.,     &end
+ &wt type='TEMP0', istep1=75001,istep2=100000, value1=100.,
+            value2=200.,     &end
+ &wt type='TEMP0', istep1=100001,istep2=150000, value1=200.,
+            value2=200.,     &end
+ &wt type='TEMP0', istep1=150001,istep2=175000, value1=200.,
+            value2=298.,     &end
+ &wt type='END'   &end
+
+# eqc.in
+NPT @ 298K,
+ &cntrl
+  imin = 0, ntx = 7, irest = 1,
+  ntpr = 500, ntwx = 500, ntwe = 0,
+  ntc = 2, ntf = 2,iwrap=1,
+  nstlim = 250000,  dt =0.002,
+  tempi=298.0, temp0 = 298.0, ntt =1, tautp =2.0,
+  ntb = 2, ntp = 1, taup = 0.2, pres0 =1.0,
+ &end
+
+
